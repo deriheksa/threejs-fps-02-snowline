@@ -3,7 +3,13 @@
 // reads at a glance from the far spawn.
 import * as THREE from 'three';
 
-function label(text, x, y, z, color = '#ffd34d', size = 2.2) {
+// Signage is painted ON walls, never floated in the air: a wall sign is a
+// flat plane mesh on a real wall face, so it is occluded like any other
+// geometry and reads as part of the station. (Floating depthTest:false
+// sprites used to hang huge in the middle of the sightline and fill the
+// fight and plant screenshots with UI-looking discs — the single biggest
+// visual gap against the top entries, whose site names sit on walls.)
+function signCanvas(text, color = '#ffd34d') {
   const canvas = document.createElement('canvas');
   canvas.width = 512; canvas.height = 128;
   const ctx = canvas.getContext('2d');
@@ -20,18 +26,27 @@ function label(text, x, y, z, color = '#ffd34d', size = 2.2) {
   ctx.textBaseline = 'middle';
   ctx.fillStyle = color;
   ctx.fillText(text, 256, 66);
-  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
-    map: new THREE.CanvasTexture(canvas), transparent: true, depthTest: false,
-  }));
-  sprite.scale.set(size * 4, size, 1);
-  sprite.position.set(x, y, z);
-  return sprite;
+  return canvas;
 }
 
-// One giant site letter on a dark disc, the way the top entries paint a
+// A plaque on a wall face: (x, y, z) is the centre of the plane, rotY turns
+// its +z normal toward the room it names. w/h are metres on the wall.
+function wallSign(text, x, y, z, rotY, color = '#ffd34d', w = 8, h = 2) {
+  const mesh = new THREE.Mesh(
+    new THREE.PlaneGeometry(w, h),
+    new THREE.MeshBasicMaterial({
+      map: new THREE.CanvasTexture(signCanvas(text, color)), transparent: true,
+    }),
+  );
+  mesh.position.set(x, y, z);
+  mesh.rotation.y = rotY;
+  return mesh;
+}
+
+// One big site letter painted on a wall, the way the top entries paint a
 // huge "B" on a brick wall: the letter is the landmark, readable from the
-// far spawn without squinting.
-function giantLetter(letter, x, y, z, color = '#ffb347') {
+// lane that leads into the site, without ever floating in the sightline.
+function wallLetter(letter, x, y, z, rotY, color = '#ffb347', size = 3) {
   const canvas = document.createElement('canvas');
   canvas.width = 256; canvas.height = 256;
   const ctx = canvas.getContext('2d');
@@ -49,12 +64,15 @@ function giantLetter(letter, x, y, z, color = '#ffb347') {
   ctx.textBaseline = 'middle';
   ctx.fillStyle = color;
   ctx.fillText(letter, 128, 136);
-  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
-    map: new THREE.CanvasTexture(canvas), transparent: true, depthTest: false,
-  }));
-  sprite.scale.set(5, 5, 1);
-  sprite.position.set(x, y, z);
-  return sprite;
+  const mesh = new THREE.Mesh(
+    new THREE.PlaneGeometry(size, size),
+    new THREE.MeshBasicMaterial({
+      map: new THREE.CanvasTexture(canvas), transparent: true,
+    }),
+  );
+  mesh.position.set(x, y, z);
+  mesh.rotation.y = rotY;
+  return mesh;
 }
 
 export function architecture(scene) {
@@ -89,13 +107,17 @@ export function architecture(scene) {
       scene.add(lamp);
     }
   }
-  // Big site signage.
-  scene.add(label('SITE A', 13, 6.8, -12));
-  scene.add(label('SITE B', 13, 7.6, 12));
-  scene.add(label('GONDOLA HALL', 13, 5.6, -16.2, '#9fd8ff', 1.4));
-  scene.add(label('CABLE YARD', 13, 5.6, 16.2, '#9fd8ff', 1.4));
-  scene.add(label('SNOWLINE', -20.5, 6.5, 0, '#ffffff', 1.6));
-  // Giant site letters on the lane-facing walls, one per site.
-  scene.add(giantLetter('A', 8.6, 3.4, -12, '#ffb347'));
-  scene.add(giantLetter('B', 8.6, 3.4, 12, '#ffb347'));
+  // Site signage, all on real wall faces (see the note above signCanvas):
+  // the SITE plaques sit on the rooms' far walls, the hall names under
+  // them, the big letters on the west face of each site's entry wall so a
+  // push down A-long / B-long reads its letter, and SNOWLINE on the west
+  // boundary wall behind the SUMMIT spawn.
+  scene.add(wallSign('SITE A', 13, 3.5, -16.2, 0));
+  scene.add(wallSign('SITE B', 13, 3.5, 16.2, Math.PI));
+  scene.add(wallSign('GONDOLA HALL', 13, 1.9, -16.2, 0, '#9fd8ff', 5, 1.25));
+  scene.add(wallSign('CABLE YARD', 13, 1.9, 16.2, Math.PI, '#9fd8ff', 5, 1.25));
+  scene.add(wallSign('SNOWLINE', -21.4, 3.6, 0, Math.PI / 2, '#ffffff', 7, 1.75));
+  // Big site letters on the lane-facing entry walls, one per site.
+  scene.add(wallLetter('A', 8.7, 2.6, -14.85, -Math.PI / 2, '#ffb347'));
+  scene.add(wallLetter('B', 8.7, 2.6, 14.85, -Math.PI / 2, '#ffb347'));
 }

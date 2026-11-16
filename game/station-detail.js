@@ -82,5 +82,6 @@ export function stationDetail(scene) {
   scene.add(sign('GONDOLA 07', 13, 4.9, -13, '#ffffff'));
   scene.add(sign('A-LONG →', -8, 3.2, -13.5, '#9fd8ff'));
   scene.add(sign('← B-LONG', -8, 3.2, 13.5, '#9fd8ff'));
-  scene.add(sign('MID', 0, 3.2, 0, '#9fd8ff'));
+  // No 'MID' sign: a floating lane label sat dead-centre in the fight
+  // stills and read as UI text. The HUD's location line names the lane.
 }

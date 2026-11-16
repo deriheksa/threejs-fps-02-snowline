@@ -34,7 +34,7 @@ export function view(s, prefs) {
   // nearby props never go pitch black. It has to be strong (the gun's
   // materials are dark and ACES crushes the mids): at 0.9 the receiver
   // read as a flat black slab in the screenshots.
-  const camLight = new THREE.PointLight(0xfff2dd, 2.2, 4, 1.5);
+  const camLight = new THREE.PointLight(0xfff2dd, 1.5, 4, 1.5);
   camera.add(camLight);
   const motion = viewMotion();
   let gunMesh = null;
@@ -54,6 +54,8 @@ export function view(s, prefs) {
   // Muzzle flash: a star-shaped additive sprite at the barrel tip, shown
   // while the player's muzzle timer runs. The top entries all show the
   // flash star in their fight shots; without it the gun looks unfired.
+  // A spiked star, not a soft blob: a radial gradient alone read as a
+  // white sun hanging off the barrel in the staged stills.
   const flashCanvas = document.createElement('canvas');
   flashCanvas.width = flashCanvas.height = 64;
   const fctx = flashCanvas.getContext('2d');
@@ -64,6 +66,12 @@ export function view(s, prefs) {
     fgrad.addColorStop(1, 'rgba(255,120,20,0)');
     fctx.fillStyle = fgrad;
     fctx.fillRect(0, 0, 64, 64);
+    // Four spikes: long horizontal/vertical, shorter diagonal.
+    fctx.fillStyle = 'rgba(255,220,140,0.95)';
+    for (const [w, h, x, y] of [
+      [56, 5, 4, 29.5], [5, 56, 29.5, 4],
+      [34, 4, 15, 30], [4, 34, 30, 15],
+    ]) fctx.fillRect(x, y, w, h);
   } else if (fctx) {
     fctx.fillStyle = '#ffb347';
     fctx.fillRect(0, 0, 64, 64);
@@ -72,7 +80,7 @@ export function view(s, prefs) {
   const muzzleFlash = new THREE.Sprite(new THREE.SpriteMaterial({
     map: flashTex, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false,
   }));
-  muzzleFlash.scale.set(0.45, 0.45, 1);
+  muzzleFlash.scale.set(0.5, 0.5, 1);
   muzzleFlash.position.set(0.34, -0.28, -1.3);
   muzzleFlash.visible = false;
   camera.add(muzzleFlash);
@@ -111,9 +119,9 @@ export function view(s, prefs) {
   // Tracer beams: thin additive boxes stretched muzzle-to-impact. A 1 px
   // line is invisible at 720p — the top entries' tracers read because they
   // are thick bright bolts. One beam per effect, pooled.
-  const beamGeo = new THREE.BoxGeometry(0.045, 0.045, 1);
+  const beamGeo = new THREE.BoxGeometry(0.09, 0.09, 1);
   const beamMat = new THREE.MeshBasicMaterial({
-    color: 0xffc94d, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false,
+    color: 0xffe2a0, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false,
   });
   const beams = [];
   for (let i = 0; i < 12; i++) {
@@ -188,12 +196,14 @@ export function view(s, prefs) {
       p.x = -14; p.z = 0; aim(-Math.PI / 2, 0);
       staged = true;
     } else if (shotMode === 'play' && s.phase === 'live') {
-      // Mid lane, looking east-southeast: the sunlit lane, both site signs,
-      // the ridge and the sky in frame, three VALE soldiers in the open
-      // ahead. (A-long puts the camera in the north wing's shadow with a
-      // cargo crate in the foreground.) One smoke cloud drifts behind the
-      // soldiers so it frames them instead of veiling them; tracers run
-      // from the player's muzzle out and from a soldier back in.
+      // Mid lane, looking east: the long open sightline down the lane,
+      // three VALE soldiers in the open ahead, the site signs and the
+      // ridge in frame. The west-facing poses were tried and dropped:
+      // Mid's offset baffles chop the westward sightline, so every
+      // west-facing still put a baffle face or a cargo crate across the
+      // frame a metre from the lens. East, the lane runs open to the
+      // sites, and the low western sun lights the soldiers' faces toward
+      // the camera instead of rimming them into silhouettes.
       // Mid-match state, like the top entries' fight shots (round 4-7,
       // a rifle bought, money in the thousands) instead of a bare round 1.
       s.round = 4; s.score = [2, 1]; s.timer = 82;
@@ -223,13 +233,16 @@ export function view(s, prefs) {
     } else if (shotMode === 'end' && s.phase === 'live') {
       // South entry of site A, looking north through the gap: the planted
       // charge in front of the red gondola cabin, GONDOLA HALL signage
-      // above, two defenders closing in. Standing a metre west of the
-      // entry's centre line keeps the fence post off the charge.
+      // above, two defenders closing in. The camera stands in the
+      // connector just south of the entry (12, -7.5), close enough that
+      // the charge reads at a glance — the first pose stood a metre
+      // further back and the entry wall filled half the frame while the
+      // charge sat small behind a fence post.
       s.round = 4; s.score = [2, 1];
       p.money = 3850; p.w = 2; p.ammo = 25; p.reserve = 90;
       p.grenades = { frag: 1, flash: 1, smoke: 1 };
       gunMesh = setWeapon(2);
-      p.x = 11.2; p.z = -5.5; aim(-0.16, 0);
+      p.x = 12; p.z = -7.5; aim(-0.16, 0);
       s.bomb = { x: 13, z: -10, fuse: 30 };
       // Same two real kills as the fight shot, so the feed reads live
       // here too.
@@ -246,7 +259,7 @@ export function view(s, prefs) {
       // Bright phase for the charge's blinking light, so the amber dot
       // reads in the still.
       if (Math.sin(s.t * 6) <= 0) s.t += Math.PI / 6;
-      const guards = [[11.5, -9], [15, -11]];
+      const guards = [[11, -10.5], [15, -11]];
       for (let i = 0; i < 2; i++) {
         const e = s.actors[5 + i];
         e.x = guards[i][0]; e.z = guards[i][1]; e.alive = true; e.yaw = Math.PI;
@@ -267,6 +280,7 @@ export function view(s, prefs) {
   // The scoreboard and vitals rebuild only when their text changes, so the
   // DOM is not churned every frame.
   let lastScoreHtml = '', lastVitalsHtml = '', lastAmmoText = '', lastZone = '';
+  let lastFeedHtml = '', lastRadioHtml = '', lastBuyKey = '', lastHintVisible = null;
   const zoneOf = (p) => {
     if (Math.hypot(p.x - 13, p.z + 10) < 5) return 'A · GONDOLA HALL';
     if (Math.hypot(p.x - 13, p.z - 11) < 5) return 'B · CABLE YARD';
@@ -300,9 +314,29 @@ export function view(s, prefs) {
       if (zone !== lastZone) { loc.textContent = zone; lastZone = zone; }
     }
     const feed = $('feed');
-    if (feed) feed.innerHTML = s.feed.map((f) => `<div>${f}</div>`).join('');
+    if (feed) {
+      // Rebuilt only when the feed changes: rewriting innerHTML every
+      // frame churns the DOM for nothing, same as the radio and the shop.
+      const html = s.feed.map((f) => `<div>${f}</div>`).join('');
+      if (html !== lastFeedHtml) { feed.innerHTML = html; lastFeedHtml = html; }
+    }
     const radio = $('radio');
-    if (radio) radio.innerHTML = s.radio.map((r) => `<div>${r}</div>`).join('');
+    if (radio) {
+      // Two lines at most: four lines of small callouts crowded the
+      // bottom-left of every live screenshot. The log still holds four;
+      // the screen shows the two newest.
+      const html = s.radio.slice(0, 2).map((r) => `<div>${r}</div>`).join('');
+      if (html !== lastRadioHtml) { radio.innerHTML = html; lastRadioHtml = html; }
+    }
+    const hint = $('hint');
+    if (hint) {
+      // A control reminder, not a permanent fixture: the first ten
+      // seconds of round 1's live phase only. It used to sit on every
+      // screenshot, reading as unfinished UI next to the top entries'
+      // clean frames; the menu already lists the controls.
+      const show = s.phase === 'live' && s.round === 1 && s.t < 25;
+      if (show !== lastHintVisible) { hint.style.display = show ? '' : 'none'; lastHintVisible = show; }
+    }
     const banner = $('banner');
     if (banner) {
       banner.textContent = s.phase === 'buy' ? `BUY PHASE — ${fmt(s.timer)}s · Press B for REQUISITION`
@@ -333,6 +367,9 @@ export function view(s, prefs) {
   }
 
   // Buy menu: five weapon columns with prices/stats/owned markers, plus gear.
+  // Rebuilt only when something in it changes (money, timer, loadout):
+  // rewriting the shop's innerHTML every frame churned the DOM for
+  // nothing while the player was just standing in the buy phase.
   function updateBuy() {
     const shop = $('shop');
     if (!shop) return;
@@ -340,6 +377,10 @@ export function view(s, prefs) {
     const visible = s.phase === 'buy';
     shop.classList.toggle('hidden', !visible);
     if (!visible) return;
+    const key = [p.money, fmt(s.timer), p.w, p.ammo, p.grenades.frag,
+      p.grenades.smoke, p.grenades.flash, p.armor, p.helmet, p.kit].join('|');
+    if (key === lastBuyKey) return;
+    lastBuyKey = key;
     shop.innerHTML = `<div class="shop-title">REQUISITION — $${p.money} · ${fmt(s.timer)}s left</div>` +
       weapons.map((w, i) => `
         <div class="shop-col ${p.w === i ? 'owned' : ''}" data-weapon="${i}">

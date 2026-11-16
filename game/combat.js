@@ -1,6 +1,9 @@
 // SNOWLINE — line of sight, damage, shooting, reloads, grenades.
-// All hit math is 2D (x/z) plus a height check; walls are tested with a
-// slab test per axis so low cover only blocks low rays.
+// Hit detection is a ray against each soldier's body: a horizontal ray
+// against the standing circle (or prone capsule) plus a pitch-aware height
+// window, with a head zone at the top of the body for double damage.
+// Walls are tested with a slab test per axis so low cover only blocks
+// low rays.
 import { eyeHeight, bodyTop, proneAmount, actorRay } from './stance.js';
 import { weapons, random, log, walls, cover } from './state.js';
 
