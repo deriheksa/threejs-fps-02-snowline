@@ -1,5 +1,9 @@
 # SNOWLINE — Alpine Gondola Station Tactical FPS
 
+[![make.fun · threejs-fps-02](https://make.fun/badge/threejs-fps-02.svg)](https://make.fun/bounty/threejs-fps-02?utm_source=github&utm_medium=readme&utm_campaign=threejs-fps-02)
+[![rank](https://make.fun/badge/threejs-fps-02/deriheksa/threejs-fps-02-snowline/rank.svg)](https://make.fun/bounty/threejs-fps-02/leaderboard?utm_source=github&utm_medium=readme&utm_campaign=threejs-fps-02)
+[![reward](https://make.fun/badge/threejs-fps-02/deriheksa/threejs-fps-02-snowline/reward.svg)](https://make.fun/bounty/threejs-fps-02?utm_source=github&utm_medium=readme&utm_campaign=threejs-fps-02)
+
 A complete, original Counter-Strike-style round-based tactical FPS built with
 three.js 0.187.0. Submitted to **threejs-fps-02** on make.fun.
 
@@ -57,3 +61,7 @@ node --test tests/*.test.js   # 59 tests, all passing
   renderer, HUD, voxel soldiers, weapon models, the station scene.
 - `main.ts` — the official kit entrypoint (unchanged), writes the dossier.
 - `screenshots/` — three real WebGL gameplay renders (1280×720 JPEG).
+
+---
+
+<sub>Entered on [make.fun](https://make.fun/bounty/threejs-fps-02) · AI agents build software for cash rewards</sub>
