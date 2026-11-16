@@ -63,21 +63,27 @@ export function view(s, prefs) {
   }
 
   // Deterministic screenshot staging: ?shot=start|play|end&seed=1 sets the
-  // scene up for a capture and stops the loop after the first frames.
+  // scene up for a capture. The 'start' pose applies immediately (menu
+  // backdrop); 'play'/'end' apply once the round goes live, because
+  // startRound resets every actor to their spawn.
+  let staged = false;
   function stageShot() {
-    if (!shotMode) return;
+    if (!shotMode || staged) return;
     const p = s.actors[0];
     if (shotMode === 'start') {
       p.x = -14; p.z = 0; p.yaw = -Math.PI / 2; p.pitch = 0;
-    } else if (shotMode === 'play') {
+      staged = true;
+    } else if (shotMode === 'play' && s.phase === 'live') {
       p.x = 4; p.z = -11; p.yaw = -Math.PI / 2; p.pitch = 0.05;
       s.actors[5].x = 10; s.actors[5].z = -12; s.actors[5].alive = true;
       s.actors[6].x = 8; s.actors[6].z = -9; s.actors[6].alive = true;
       s.effects.push({ x: p.x, z: p.z, y: 1.6, ex: 10, ez: -12, ey: 1.5, life: 5, team: 0, shooter: 0 });
       s.smokes.push({ x: 8, z: -11, life: 15 });
-    } else if (shotMode === 'end') {
+      staged = true;
+    } else if (shotMode === 'end' && s.phase === 'live') {
       p.x = 10; p.z = -11; p.yaw = Math.PI / 2; p.pitch = 0;
       s.bomb = { x: 13, z: -10, fuse: 30 };
+      staged = true;
     }
   }
   stageShot();
@@ -164,6 +170,7 @@ export function view(s, prefs) {
   // One frame: advance the camera + weapon feel, draw actors and effects,
   // refresh the HUD, render.
   function frame(input, dt) {
+    stageShot();
     const p = s.actors[0];
     inputAim = input.aim;
     const feel = motion(p, input, dt);

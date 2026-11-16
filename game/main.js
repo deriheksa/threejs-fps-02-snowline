@@ -146,4 +146,4 @@ function loop(now) {
 requestAnimationFrame(loop);
 
 // Expose the state for the test harness and the screenshot hook.
-window.__snowline = { s, prefs, startGame };
+window.__snowline = { s, prefs, input, startGame };
