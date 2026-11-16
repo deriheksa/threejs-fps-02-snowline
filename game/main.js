@@ -37,6 +37,13 @@ diffBtns.forEach((b) => {
   };
 });
 
+function lockPointer() {
+  try {
+    const p = document.body.requestPointerLock?.();
+    p?.catch?.(() => {}); // headless / no-gesture environments reject; ignore
+  } catch { /* pointer lock unavailable */ }
+}
+
 function startGame() {
   unlockAudio();
   setVolume(prefs.volume);
@@ -46,7 +53,7 @@ function startGame() {
   if (s.phase === 'menu') startRound(s);
   s.paused = false;
   running = true;
-  document.body.requestPointerLock?.();
+  lockPointer();
 }
 
 if (startBtn) startBtn.onclick = startGame;
@@ -54,7 +61,7 @@ if (resumeBtn) resumeBtn.onclick = () => {
   s.paused = false;
   pauseMenu.classList.add('hidden');
   running = true;
-  document.body.requestPointerLock?.();
+  lockPointer();
 };
 if (quitBtn) quitBtn.onclick = () => {
   s.paused = true;
@@ -87,7 +94,7 @@ function handleAction(action) {
     pauseMenu.classList.toggle('hidden', !s.paused);
     running = !s.paused;
     if (s.paused) document.exitPointerLock?.();
-    else document.body.requestPointerLock?.();
+    else lockPointer();
     return;
   }
   if (!running || s.paused) return;
