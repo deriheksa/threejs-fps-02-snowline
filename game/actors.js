@@ -5,14 +5,20 @@
 import * as THREE from 'three';
 import { weapons } from './state.js';
 
-const SKIN = [0xe8c39a, 0xc9a06a, 0x8a6a44, 0x5a4a3a, 0x6b5a44];
-const CLOTH = [0x3a6b8a, 0x2f5d7a, 0x8a4a3a, 0x4a5a3a, 0x5a4a6b];
+const SKIN = [0xf0cfa8, 0xd8b47e, 0xa8825a, 0x7a6248, 0x8a7458];
+const CLOTH = [0x5a8ab5, 0x4a7a9e, 0xb06048, 0x6a7a4a, 0x7a6490];
 
 // One box with a standard material, positioned inside a group.
-function box(parent, w, h, d, x, y, z, color, roughness = 0.8) {
+// `glow` (0..1) adds an emissive lift in the box's own colour — used for
+// team torsos so soldiers read at a glance in blue hour.
+function box(parent, w, h, d, x, y, z, color, roughness = 0.8, glow = 0) {
   const mesh = new THREE.Mesh(
     new THREE.BoxGeometry(w, h, d),
-    new THREE.MeshStandardMaterial({ color, roughness, metalness: 0.05 }),
+    new THREE.MeshStandardMaterial({
+      color, roughness, metalness: 0.05,
+      emissive: glow ? new THREE.Color(color) : 0x000000,
+      emissiveIntensity: glow,
+    }),
   );
   mesh.position.set(x, y, z);
   mesh.castShadow = true;
@@ -48,11 +54,12 @@ export function preloadActors(actors) {
     if (cache.has(a.id)) continue;
     const group = new THREE.Group();
     group.userData.artStyle = 'original-articulated-voxel';
-    const teamColor = a.team === 0 ? 0x4a8ab5 : 0xb55a4a;
+    // Bright team colours so soldiers read instantly against the blue hour.
+    const teamColor = a.team === 0 ? 0x2fb3ff : 0xff7a45;
     const cloth = CLOTH[a.id % CLOTH.length];
     const skin = SKIN[a.id % SKIN.length];
     const head = box(group, 0.32, 0.3, 0.32, 0, 1.62, 0, skin);
-    const torso = box(group, 0.52, 0.72, 0.3, 0, 1.05, 0, teamColor);
+    const torso = box(group, 0.52, 0.72, 0.3, 0, 1.05, 0, teamColor, 0.65, 0.5);
     const shoulders = box(group, 0.56, 0.12, 0.34, 0, 1.32, 0, cloth); // shoulders
     const armL = box(group, 0.14, 0.55, 0.14, -0.34, 1.1, 0, cloth);
     const armR = box(group, 0.14, 0.55, 0.14, 0.34, 1.1, 0, cloth);
@@ -69,7 +76,9 @@ export function preloadActors(actors) {
     ctx.fillStyle = a.team === 0 ? '#9fd8ff' : '#ffb0a0';
     ctx.fillText(a.name, 128, 42);
     const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
-      map: new THREE.CanvasTexture(canvas), transparent: true, depthTest: false,
+      // depthTest on: tags are occluded by walls, so they never float over
+      // solid geometry (and never give away an enemy behind cover).
+      map: new THREE.CanvasTexture(canvas), transparent: true, depthTest: true,
     }));
     sprite.scale.set(1.6, 0.4, 1);
     sprite.position.set(0, 2.1, 0);

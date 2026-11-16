@@ -24,10 +24,10 @@ export function texture(name, size = 256) {
       ctx.fillRect(Math.random() * size, Math.random() * size, 2, 2);
     }
   } else {
-    ctx.fillStyle = '#7a7d80';
+    ctx.fillStyle = '#9aa0a3';
     ctx.fillRect(0, 0, size, size);
     for (let i = 0; i < 1200; i++) {
-      ctx.fillStyle = `rgba(0, 0, 0, ${Math.random() * 0.15})`;
+      ctx.fillStyle = `rgba(255, 255, 255, ${Math.random() * 0.12})`;
       ctx.fillRect(Math.random() * size, Math.random() * size, 3, 3);
     }
   }
@@ -40,12 +40,12 @@ export function texture(name, size = 256) {
 // the snow particle system, and a per-frame updater.
 export function world() {
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x1a2a3a);
-  scene.fog = new THREE.Fog(0x1a2a3a, 30, 90);
+  scene.background = new THREE.Color(0x35597a);
+  scene.fog = new THREE.Fog(0x35597a, 40, 110);
 
-  const hemi = new THREE.HemisphereLight(0xbfd9ff, 0x2a2a30, 0.9);
+  const hemi = new THREE.HemisphereLight(0xd6e8ff, 0x3a3f45, 1.3);
   scene.add(hemi);
-  const sun = new THREE.DirectionalLight(0xffd9a0, 1.6);
+  const sun = new THREE.DirectionalLight(0xffd9a0, 2.2);
   sun.position.set(-30, 40, -20);
   sun.castShadow = true;
   sun.shadow.mapSize.set(1024, 1024);
@@ -54,7 +54,7 @@ export function world() {
   sun.shadow.camera.top = 30;
   sun.shadow.camera.bottom = -30;
   scene.add(sun);
-  const fill = new THREE.DirectionalLight(0x88aaff, 0.4);
+  const fill = new THREE.DirectionalLight(0x88aaff, 0.6);
   fill.position.set(25, 15, 25);
   scene.add(fill);
 
@@ -100,8 +100,25 @@ export function world() {
   }
   const snowGeo = new THREE.BufferGeometry();
   snowGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  // Soft round flake texture so near-camera flakes read as snow, not
+  // squares. Built defensively: if the 2D canvas API is unavailable or
+  // incomplete (headless stubs), the snow falls back to plain points.
+  let flakeMap = null;
+  const flakeCanvas = document.createElement('canvas');
+  flakeCanvas.width = flakeCanvas.height = 32;
+  const fctx = flakeCanvas.getContext('2d');
+  const grad = fctx?.createRadialGradient?.(16, 16, 0, 16, 16, 16);
+  if (grad && typeof grad.addColorStop === 'function') {
+    grad.addColorStop(0, 'rgba(255,255,255,1)');
+    grad.addColorStop(0.6, 'rgba(255,255,255,0.6)');
+    grad.addColorStop(1, 'rgba(255,255,255,0)');
+    fctx.fillStyle = grad;
+    fctx.fillRect(0, 0, 32, 32);
+    flakeMap = new THREE.CanvasTexture(flakeCanvas);
+  }
   const snow = new THREE.Points(snowGeo, new THREE.PointsMaterial({
-    color: 0xffffff, size: 0.08, transparent: true, opacity: 0.85,
+    color: 0xffffff, size: 0.12, transparent: true, opacity: 0.85,
+    ...(flakeMap ? { map: flakeMap } : {}), depthWrite: false,
   }));
   scene.add(snow);
 

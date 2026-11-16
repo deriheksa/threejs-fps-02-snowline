@@ -15,10 +15,10 @@ const PART = {
 
 // Build the view model for weapon index w (0..4). group is positioned by
 // view.js each frame (ADS, recoil, reload sway).
-export function weaponModel(w, color = 0x2c3138) {
+export function weaponModel(w, color = 0x55606c) {
   const group = new THREE.Group();
   const body = new THREE.MeshStandardMaterial({ color, roughness: 0.6, metalness: 0.35 });
-  const dark = new THREE.MeshStandardMaterial({ color: 0x16191d, roughness: 0.7, metalness: 0.25 });
+  const dark = new THREE.MeshStandardMaterial({ color: 0x2a2f36, roughness: 0.7, metalness: 0.25 });
   const accent = new THREE.MeshStandardMaterial({ color: 0xc9802a, roughness: 0.5, metalness: 0.4 });
   const add = (part, material = body) => {
     const [w, h, d, x, y, z] = part;

@@ -29,6 +29,10 @@ export function view(s, prefs) {
 
   const scene = world();
   const camera = new THREE.PerspectiveCamera(prefs.fov, innerWidth / innerHeight, 0.05, 220);
+  // A small warm fill light rides with the camera so the view-model gun and
+  // nearby props are never pitch black.
+  const camLight = new THREE.PointLight(0xfff2dd, 0.9, 3, 1.5);
+  camera.add(camLight);
   const motion = viewMotion();
   let gunMesh = null;
   camera.add(gunMesh = weaponModel(0));
@@ -52,8 +56,25 @@ export function view(s, prefs) {
     scene.scene.add(line);
     tracers.push(line);
   }
-  const smokeMat = new THREE.SpriteMaterial({ color: 0xcfd8dc, transparent: true, opacity: 0.55, depthWrite: false });
   const smokeSprites = [];
+  // Soft radial blob texture so smoke reads as a cloud, not a white box.
+  const smokeCanvas = document.createElement('canvas');
+  smokeCanvas.width = smokeCanvas.height = 64;
+  const sctx = smokeCanvas.getContext('2d');
+  const sgrad = sctx?.createRadialGradient?.(32, 32, 2, 32, 32, 32);
+  let smokeMap = null;
+  if (sgrad && typeof sgrad.addColorStop === 'function') {
+    sgrad.addColorStop(0, 'rgba(255,255,255,0.9)');
+    sgrad.addColorStop(0.6, 'rgba(255,255,255,0.45)');
+    sgrad.addColorStop(1, 'rgba(255,255,255,0)');
+    sctx.fillStyle = sgrad;
+    sctx.fillRect(0, 0, 64, 64);
+    smokeMap = new THREE.CanvasTexture(smokeCanvas);
+  }
+  const smokeMat = new THREE.SpriteMaterial({
+    color: 0xcfd8dc, transparent: true, opacity: 0.55, depthWrite: false,
+    ...(smokeMap ? { map: smokeMap } : {}),
+  });
   for (let i = 0; i < 8; i++) {
     const sprite = new THREE.Sprite(smokeMat);
     sprite.scale.set(6, 6, 1);
@@ -61,27 +82,59 @@ export function view(s, prefs) {
     scene.scene.add(sprite);
     smokeSprites.push(sprite);
   }
+  // The planted charge: a dark case with a blinking amber light, visible
+  // only while s.bomb exists. The HUD alone used to be the only sign.
+  const bombCase = new THREE.Mesh(
+    new THREE.BoxGeometry(0.45, 0.28, 0.45),
+    new THREE.MeshStandardMaterial({ color: 0x22262b, roughness: 0.5, metalness: 0.6 }),
+  );
+  const bombLight = new THREE.Mesh(
+    new THREE.BoxGeometry(0.12, 0.06, 0.12),
+    new THREE.MeshStandardMaterial({ color: 0xff9a1a, emissive: 0xff9a1a, emissiveIntensity: 2 }),
+  );
+  bombLight.position.y = 0.17;
+  bombCase.add(bombLight);
+  bombCase.visible = false;
+  scene.scene.add(bombCase);
 
   // Deterministic screenshot staging: ?shot=start|play|end&seed=1 sets the
   // scene up for a capture. The 'start' pose applies immediately (menu
   // backdrop); 'play'/'end' apply once the round goes live, because
   // startRound resets every actor to their spawn.
+  // NOTE: the sim overwrites the player's yaw from input.yaw every tick
+  // (simulation.js: p.yaw = input.yaw), so staging must set BOTH — setting
+  // p.yaw alone is silently undone on the next tick.
   let staged = false;
-  function stageShot() {
+  // `inp` is the live input object (frame only). At view creation there is
+  // no input yet, so the start pose only sets p.yaw/pitch there and the
+  // first frame re-applies it with input.
+  function stageShot(inp) {
     if (!shotMode || staged) return;
     const p = s.actors[0];
+    const aim = (yaw, pitch) => {
+      p.yaw = yaw; p.pitch = pitch;
+      if (inp) { inp.yaw = yaw; inp.pitch = pitch; }
+    };
     if (shotMode === 'start') {
-      p.x = -14; p.z = 0; p.yaw = -Math.PI / 2; p.pitch = 0;
+      p.x = -14; p.z = 0; aim(-Math.PI / 2, 0);
       staged = true;
     } else if (shotMode === 'play' && s.phase === 'live') {
-      p.x = 4; p.z = -11; p.yaw = -Math.PI / 2; p.pitch = 0.05;
-      s.actors[5].x = 10; s.actors[5].z = -12; s.actors[5].alive = true;
-      s.actors[6].x = 8; s.actors[6].z = -9; s.actors[6].alive = true;
-      s.effects.push({ x: p.x, z: p.z, y: 1.6, ex: 10, ez: -12, ey: 1.5, life: 5, team: 0, shooter: 0 });
-      s.smokes.push({ x: 8, z: -11, life: 15 });
+      // A-long, looking east toward site A: a clean open sightline (the Mid
+      // baffles block the equivalent Mid shot), enemies in the open ahead.
+      p.x = -6; p.z = -11; aim(-Math.PI / 2, 0);
+      const spots = [[0, -11], [2, -10], [4, -12]];
+      for (let i = 0; i < 3; i++) {
+        const e = s.actors[5 + i];
+        e.x = spots[i][0]; e.z = spots[i][1]; e.alive = true;
+      }
+      s.effects.push({ x: p.x, z: p.z, y: 1.6, ex: 0, ez: -11, ey: 1.5, life: 5, team: 0, shooter: 0 });
+      s.smokes.push({ x: 2, z: -11.5, life: 15 });
       staged = true;
     } else if (shotMode === 'end' && s.phase === 'live') {
-      p.x = 10; p.z = -11; p.yaw = Math.PI / 2; p.pitch = 0;
+      // Outside site A, looking in through the west entry: the planted
+      // charge, the red gondola cabin and the site signage all in frame
+      // (standing inside puts the camera under the hall canopy).
+      p.x = 6; p.z = -12; aim(-Math.PI / 2, 0);
       s.bomb = { x: 13, z: -10, fuse: 30 };
       staged = true;
     }
@@ -170,7 +223,7 @@ export function view(s, prefs) {
   // One frame: advance the camera + weapon feel, draw actors and effects,
   // refresh the HUD, render.
   function frame(input, dt) {
-    stageShot();
+    stageShot(input);
     const p = s.actors[0];
     inputAim = input.aim;
     const feel = motion(p, input, dt);
@@ -229,6 +282,14 @@ export function view(s, prefs) {
       sprite.material.opacity = Math.min(0.55, c.life / 15 * 0.55);
     }
     for (; si < smokeSprites.length; si++) smokeSprites[si].visible = false;
+    // Planted charge model + blinking light.
+    if (s.bomb) {
+      bombCase.visible = true;
+      bombCase.position.set(s.bomb.x, 0.14, s.bomb.z);
+      bombLight.material.emissiveIntensity = (Math.sin(s.t * 6) > 0) ? 2.5 : 0.3;
+    } else {
+      bombCase.visible = false;
+    }
 
     scene.update(dt, prefs.snow);
     updateHud();
