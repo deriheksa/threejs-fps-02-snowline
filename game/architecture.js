@@ -7,15 +7,52 @@ function label(text, x, y, z, color = '#ffd34d', size = 2.2) {
   const canvas = document.createElement('canvas');
   canvas.width = 512; canvas.height = 128;
   const ctx = canvas.getContext('2d');
+  // Dark plaque behind the letters: bare glowing text dissolved into the
+  // pale walls and snow at a glance. The plaque makes the sign read as a
+  // sign, like the top entries' big wall boards.
+  ctx.fillStyle = 'rgba(8, 12, 16, 0.88)';
+  ctx.fillRect(6, 10, 500, 108);
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 4;
+  ctx.strokeRect(10, 14, 492, 100);
   ctx.font = 'bold 72px monospace';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.fillStyle = color;
-  ctx.fillText(text, 256, 64);
+  ctx.fillText(text, 256, 66);
   const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
     map: new THREE.CanvasTexture(canvas), transparent: true, depthTest: false,
   }));
   sprite.scale.set(size * 4, size, 1);
+  sprite.position.set(x, y, z);
+  return sprite;
+}
+
+// One giant site letter on a dark disc, the way the top entries paint a
+// huge "B" on a brick wall: the letter is the landmark, readable from the
+// far spawn without squinting.
+function giantLetter(letter, x, y, z, color = '#ffb347') {
+  const canvas = document.createElement('canvas');
+  canvas.width = 256; canvas.height = 256;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = 'rgba(8, 12, 16, 0.85)';
+  ctx.beginPath();
+  ctx.ellipse(128, 128, 120, 120, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 6;
+  ctx.beginPath();
+  ctx.ellipse(128, 128, 112, 112, 0, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.font = 'bold 170px monospace';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = color;
+  ctx.fillText(letter, 128, 136);
+  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
+    map: new THREE.CanvasTexture(canvas), transparent: true, depthTest: false,
+  }));
+  sprite.scale.set(5, 5, 1);
   sprite.position.set(x, y, z);
   return sprite;
 }
@@ -58,4 +95,7 @@ export function architecture(scene) {
   scene.add(label('GONDOLA HALL', 13, 5.6, -16.2, '#9fd8ff', 1.4));
   scene.add(label('CABLE YARD', 13, 5.6, 16.2, '#9fd8ff', 1.4));
   scene.add(label('SNOWLINE', -20.5, 6.5, 0, '#ffffff', 1.6));
+  // Giant site letters on the lane-facing walls, one per site.
+  scene.add(giantLetter('A', 8.6, 3.4, -12, '#ffb347'));
+  scene.add(giantLetter('B', 8.6, 3.4, 12, '#ffb347'));
 }

@@ -45,24 +45,26 @@ export function radarContacts(s, team, memory = new Map()) {
   return contacts;
 }
 
-// Paint the radar: dark disc, walls, site markers, allies, and enemy
-// contacts (bright when visible, faded at their last-seen spot when hidden).
+// Paint the radar: dark rounded panel, walls, site markers, allies, and
+// enemy contacts (bright when visible, faded at their last-seen spot when
+// hidden). The panel is a rectangle, not a disc: the top entries' maps are
+// rectangular and read as floor plans, and the thicker walls survive the
+// 180 px canvas.
 export function drawRadar(ctx, s, me, x, y, px, yaw = 0) {
   ctx.save();
   ctx.clearRect(x - px, y - px, px * 2, px * 2);
-  ctx.beginPath();
-  ctx.arc(x, y, px, 0, Math.PI * 2);
   ctx.fillStyle = 'rgba(0, 10, 15, 0.85)';
-  ctx.fill();
-  ctx.strokeStyle = 'rgba(160, 220, 255, 0.35)';
-  ctx.stroke();
+  ctx.fillRect(x - px, y - px, px * 2, px * 2);
+  ctx.strokeStyle = 'rgba(160, 220, 255, 0.5)';
+  ctx.lineWidth = 1.5;
+  ctx.strokeRect(x - px, y - px, px * 2, px * 2);
 
   ctx.save();
   ctx.beginPath();
-  ctx.arc(x, y, px, 0, Math.PI * 2);
+  ctx.rect(x - px, y - px, px * 2, px * 2);
   ctx.clip();
-  ctx.strokeStyle = 'rgba(140, 210, 250, 0.55)';
-  ctx.lineWidth = 1;
+  ctx.strokeStyle = 'rgba(140, 210, 250, 0.7)';
+  ctx.lineWidth = 2;
   ctx.beginPath();
   for (const [wx, wz, w, d] of walls) {
     const corners = [
@@ -77,7 +79,7 @@ export function drawRadar(ctx, s, me, x, y, px, yaw = 0) {
   }
   ctx.stroke();
 
-  ctx.font = 'bold 12px monospace';
+  ctx.font = 'bold 15px monospace';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   for (const site of sites) {
@@ -89,8 +91,9 @@ export function drawRadar(ctx, s, me, x, y, px, yaw = 0) {
   for (const c of radarContacts(s, me.team, memory)) {
     const p = radarPoint(c.x, c.z, me, yaw, 2.4, px, px);
     ctx.fillStyle = c.friend ? '#5fb7e8' : c.visible ? '#ff4d4d' : 'rgba(255, 77, 77, 0.4)';
+    const dot = c.id === 0 ? 4 : 2.5;
     ctx.beginPath();
-    ctx.arc(x + p.x - px, y + p.y - px, c.id === 0 ? 4 : 2.5, 0, Math.PI * 2);
+    ctx.ellipse(x + p.x - px, y + p.y - px, dot, dot, 0, 0, Math.PI * 2);
     ctx.fill();
   }
   ctx.restore();

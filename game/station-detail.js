@@ -58,11 +58,27 @@ export function stationDetail(scene) {
     wheel.castShadow = true;
     scene.add(wheel);
   }
-  // The red gondola cabin at site A.
-  const cabin = add(4.8, 2.2, 2.6, 13, 2.2, -13, red);
+  // The red gondola cabin at site A — the map's landmark. Saturated red
+  // with warm lit windows, so it reads as a glowing cabin at blue hour
+  // instead of a flat red box.
+  const cabinRed = new THREE.MeshStandardMaterial({ color: 0xc43a26, roughness: 0.55, metalness: 0.2 });
+  const cabin = add(4.8, 2.2, 2.6, 13, 2.2, -13, cabinRed);
   cabin.rotation.y = 0;
   add(5.2, 0.2, 3, 13, 3.4, -13, steel); // roof
   add(0.3, 1.2, 0.3, 13, 4.2, -13, steel); // hanger arm
+  const windowGlow = new THREE.MeshStandardMaterial({
+    color: 0xffc46b, emissive: 0xff9a1a, emissiveIntensity: 1.6, roughness: 0.4,
+  });
+  // Lit window strips along both long sides of the cabin.
+  for (const z of [-14.35, -11.65]) {
+    const strip = new THREE.Mesh(new THREE.BoxGeometry(3.6, 0.7, 0.08), windowGlow);
+    strip.position.set(13, 2.4, z);
+    scene.add(strip);
+  }
+  // Warm windows on the ticket booth too.
+  const boothGlow = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.7, 0.08), windowGlow);
+  boothGlow.position.set(-20, 1.6, -8.95);
+  scene.add(boothGlow);
   scene.add(sign('GONDOLA 07', 13, 4.9, -13, '#ffffff'));
   scene.add(sign('A-LONG →', -8, 3.2, -13.5, '#9fd8ff'));
   scene.add(sign('← B-LONG', -8, 3.2, 13.5, '#9fd8ff'));

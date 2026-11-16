@@ -13,6 +13,7 @@ import { weaponModel } from './models.js';
 import { world } from './world.js';
 import { observerActor, nextObserver, spectatorFov } from './camera-policy.js';
 import { sound } from './audio.js';
+import { damage } from './combat.js';
 
 const $ = (id) => document.getElementById(id);
 const fmt = (n) => Math.max(0, Math.ceil(n));
@@ -24,7 +25,7 @@ export function view(s, prefs) {
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.05;
+  renderer.toneMappingExposure = 1.15;
   document.body.appendChild(renderer.domElement);
 
   const scene = world();
@@ -37,7 +38,56 @@ export function view(s, prefs) {
   camera.add(camLight);
   const motion = viewMotion();
   let gunMesh = null;
-  camera.add(gunMesh = weaponModel(0));
+  // The view-model gun is built pointing along its local +x (barrel to the
+  // right). Rotating the group a quarter turn about Y aims the barrel down
+  // the camera's -z, so the player sees a rifle pointing where they look —
+  // the way the top entries' big view-models read — instead of a sideways
+  // bar. Scaled up and pulled closer so it fills the lower right like a
+  // real rifle instead of a distant pistol.
+  const placeGun = (g) => {
+    g.rotation.y = Math.PI / 2;
+    g.scale.setScalar(1.0);
+    g.position.set(0.34, -0.3, -0.55);
+    return g;
+  };
+  camera.add(gunMesh = placeGun(weaponModel(0)));
+  // Muzzle flash: a star-shaped additive sprite at the barrel tip, shown
+  // while the player's muzzle timer runs. The top entries all show the
+  // flash star in their fight shots; without it the gun looks unfired.
+  const flashCanvas = document.createElement('canvas');
+  flashCanvas.width = flashCanvas.height = 64;
+  const fctx = flashCanvas.getContext('2d');
+  const fgrad = fctx?.createRadialGradient?.(32, 32, 1, 32, 32, 32);
+  if (fgrad && typeof fgrad.addColorStop === 'function') {
+    fgrad.addColorStop(0, 'rgba(255,240,200,1)');
+    fgrad.addColorStop(0.35, 'rgba(255,180,60,0.9)');
+    fgrad.addColorStop(1, 'rgba(255,120,20,0)');
+    fctx.fillStyle = fgrad;
+    fctx.fillRect(0, 0, 64, 64);
+  } else if (fctx) {
+    fctx.fillStyle = '#ffb347';
+    fctx.fillRect(0, 0, 64, 64);
+  }
+  const flashTex = new THREE.CanvasTexture(flashCanvas);
+  const muzzleFlash = new THREE.Sprite(new THREE.SpriteMaterial({
+    map: flashTex, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false,
+  }));
+  muzzleFlash.scale.set(0.45, 0.45, 1);
+  muzzleFlash.position.set(0.34, -0.28, -1.3);
+  muzzleFlash.visible = false;
+  camera.add(muzzleFlash);
+  // Bot muzzle flashes: small additive sprites at recent gunfire spots, so
+  // a duel reads as a firefight instead of silent soldiers.
+  const botFlashes = [];
+  for (let i = 0; i < 4; i++) {
+    const sp = new THREE.Sprite(new THREE.SpriteMaterial({
+      map: flashTex, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false,
+    }));
+    sp.scale.set(0.5, 0.5, 1);
+    sp.visible = false;
+    scene.scene.add(sp);
+    botFlashes.push(sp);
+  }
   scene.scene.add(camera);
 
   const radarCanvas = $('radar');
@@ -58,6 +108,20 @@ export function view(s, prefs) {
     scene.scene.add(line);
     tracers.push(line);
   }
+  // Tracer beams: thin additive boxes stretched muzzle-to-impact. A 1 px
+  // line is invisible at 720p — the top entries' tracers read because they
+  // are thick bright bolts. One beam per effect, pooled.
+  const beamGeo = new THREE.BoxGeometry(0.045, 0.045, 1);
+  const beamMat = new THREE.MeshBasicMaterial({
+    color: 0xffc94d, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false,
+  });
+  const beams = [];
+  for (let i = 0; i < 12; i++) {
+    const beam = new THREE.Mesh(beamGeo, beamMat.clone());
+    beam.visible = false;
+    scene.scene.add(beam);
+    beams.push(beam);
+  }
   const smokeSprites = [];
   // Soft radial blob texture so smoke reads as a cloud, not a white box.
   const smokeCanvas = document.createElement('canvas');
@@ -77,7 +141,7 @@ export function view(s, prefs) {
     // Dark slate, not white: against snow and pale walls a white cloud is
     // invisible. A smoke grenade reads as a grey cloud, so the sprite is
     // a mid-dark blue-grey at high opacity.
-    color: 0x5a6a75, transparent: true, opacity: 0.75, depthWrite: false,
+    color: 0x4a5a65, transparent: true, opacity: 0.85, depthWrite: false,
     ...(smokeMap ? { map: smokeMap } : {}),
   });
   for (let i = 0; i < 8; i++) {
@@ -130,12 +194,28 @@ export function view(s, prefs) {
       // cargo crate in the foreground.) One smoke cloud drifts behind the
       // soldiers so it frames them instead of veiling them; tracers run
       // from the player's muzzle out and from a soldier back in.
+      // Mid-match state, like the top entries' fight shots (round 4-7,
+      // a rifle bought, money in the thousands) instead of a bare round 1.
+      s.round = 4; s.score = [2, 1]; s.timer = 82;
+      p.money = 3850; p.w = 2; p.ammo = 25; p.reserve = 90;
+      p.grenades = { frag: 1, flash: 1, smoke: 1 };
+      p.hp = 88; p.armor = 76;
+      p.muzzle = 0.085;
+      gunMesh = setWeapon(2);
       p.x = -8; p.z = 0; aim(-1.75, 0);
       const spots = [[-3, -1.2], [-1, 1], [1, -0.8]];
       for (let i = 0; i < 3; i++) {
         const e = s.actors[5 + i];
         e.x = spots[i][0]; e.z = spots[i][1]; e.alive = true;
       }
+      // Two kills already happened this round, through the real damage
+      // path (feed + radio + money, same as a live kill): the feed is
+      // never empty in the shot, and the victims are out of frame.
+      const kite = s.actors[1], mica = s.actors[2];
+      kite.w = 2; mica.w = 2;
+      damage(s, s.actors[8], 999, kite, true);
+      damage(s, s.actors[9], 999, mica, false);
+      s.gunfire.push({ x: -1, z: 1, t: s.t, team: 1, actor: 5 });
       s.effects.push({ x: p.x, z: p.z, y: 1.5, ex: -3, ez: -1.2, ey: 1.4, life: 5, team: 0, shooter: 0 });
       s.effects.push({ x: -1, z: 1, y: 1.5, ex: p.x, ez: p.z, ey: 1.5, life: 5, team: 1, shooter: 5 });
       s.smokes.push({ x: 3, z: 0, life: 15 });
@@ -145,8 +225,18 @@ export function view(s, prefs) {
       // charge in front of the red gondola cabin, GONDOLA HALL signage
       // above, two defenders closing in. Standing a metre west of the
       // entry's centre line keeps the fence post off the charge.
-      p.x = 12; p.z = -5.5; aim(-0.22, 0);
+      s.round = 4; s.score = [2, 1];
+      p.money = 3850; p.w = 2; p.ammo = 25; p.reserve = 90;
+      p.grenades = { frag: 1, flash: 1, smoke: 1 };
+      gunMesh = setWeapon(2);
+      p.x = 11.2; p.z = -5.5; aim(-0.16, 0);
       s.bomb = { x: 13, z: -10, fuse: 30 };
+      // Same two real kills as the fight shot, so the feed reads live
+      // here too.
+      const kite = s.actors[1], mica = s.actors[2];
+      kite.w = 2; mica.w = 2;
+      damage(s, s.actors[8], 999, kite, true);
+      damage(s, s.actors[9], 999, mica, false);
       // Hold fire while the still is taken: the defenders are metres away
       // with a clear line of sight, and a hit would light the damage
       // vignette across the frame. Reaction delay is ~0.25 s, so a -30 s
@@ -168,21 +258,47 @@ export function view(s, prefs) {
 
   function setWeapon(i) {
     if (gunMesh) camera.remove(gunMesh);
-    const next = weaponModel(i);
-    next.position.set(0.28, -0.26, -0.5);
+    const next = placeGun(weaponModel(i));
     camera.add(next);
     return next;
   }
 
   // HUD: scoreboard, timer, money, health, armour, ammo, feed, radio.
+  // The scoreboard and vitals rebuild only when their text changes, so the
+  // DOM is not churned every frame.
+  let lastScoreHtml = '', lastVitalsHtml = '', lastAmmoText = '', lastZone = '';
+  const zoneOf = (p) => {
+    if (Math.hypot(p.x - 13, p.z + 10) < 5) return 'A · GONDOLA HALL';
+    if (Math.hypot(p.x - 13, p.z - 11) < 5) return 'B · CABLE YARD';
+    if (p.z < -7) return 'A-LONG / NORTH WALK';
+    if (p.z > 7) return 'B-LONG / SOUTH RAMP';
+    return 'MID / TICKET PLAZA';
+  };
   function updateHud() {
     const p = s.actors[0];
     const score = $('score');
-    if (score) score.textContent = `SUMMIT ${s.score[0]} — ${s.score[1]} VALE · ROUND ${s.round}/12 · ${fmt(s.timer)}s`;
+    if (score) {
+      const pips = (n) => '●'.repeat(n) + '○'.repeat(Math.max(0, 7 - n));
+      const phase = s.phase === 'buy' ? 'BUY' : s.phase === 'live' ? (s.bomb ? 'LIVE · CHARGE' : 'LIVE') : s.phase.toUpperCase();
+      const html = `<span class="sc-chip sc-summit">SUMMIT</span> <b>${s.score[0]}</b> <span class="sc-pips">${pips(s.score[0])}</span> — <span class="sc-pips">${pips(s.score[1])}</span> <b>${s.score[1]}</b> <span class="sc-chip sc-vale">VALE</span> · ROUND ${s.round}/12 · ${fmt(s.timer)}s · ${phase}`;
+      if (html !== lastScoreHtml) { score.innerHTML = html; lastScoreHtml = html; }
+    }
     const vitals = $('vitals');
-    if (vitals) vitals.textContent = `HP ${Math.max(0, Math.round(p.hp))} · ARM ${Math.round(p.armor)} · $ ${p.money}`;
+    if (vitals) {
+      const hp = Math.max(0, Math.round(p.hp));
+      const html = `<span class="vt-label">HEALTH</span><span class="vt-bar"><i style="width:${hp}%;background:#4dd06a"></i></span><b>${hp}</b> <span class="vt-label">ARMOUR</span><span class="vt-bar"><i style="width:${Math.round(p.armor)}%;background:#5fb7e8"></i></span><b>${Math.round(p.armor)}</b> <span class="vt-money">$${p.money}</span>`;
+      if (html !== lastVitalsHtml) { vitals.innerHTML = html; lastVitalsHtml = html; }
+    }
     const ammo = $('ammo');
-    if (ammo) ammo.textContent = `${weapons[p.w].name} · ${p.ammo}/${p.reserve}${p.reload > 0 ? ' · RELOADING' : ''}`;
+    if (ammo) {
+      const text = `${weapons[p.w].name} · ${p.ammo}/${p.reserve}${p.reload > 0 ? ' · RELOADING' : ''} · FRAG ${p.grenades.frag} · SMOKE ${p.grenades.smoke}`;
+      if (text !== lastAmmoText) { ammo.textContent = text; lastAmmoText = text; }
+    }
+    const loc = $('location');
+    if (loc) {
+      const zone = zoneOf(p);
+      if (zone !== lastZone) { loc.textContent = zone; lastZone = zone; }
+    }
     const feed = $('feed');
     if (feed) feed.innerHTML = s.feed.map((f) => `<div>${f}</div>`).join('');
     const radio = $('radio');
@@ -285,9 +401,14 @@ export function view(s, prefs) {
     camera.updateProjectionMatrix();
     // Weapon feel: ADS zoom, recoil kick, reload sway.
     gunMesh.position.set(
-      0.28 - feel.ads * 0.16, -0.26 + feel.ads * 0.06 - feel.reload * 0.08, -0.5);
+      0.34 - feel.ads * 0.16, -0.3 + feel.ads * 0.06 - feel.reload * 0.08, -0.55);
     gunMesh.rotation.x = feel.kick * 0.06 + feel.reload * 0.4;
     gunMesh.visible = p.alive && cameraMode === 'fpp';
+    // Muzzle flash follows the barrel tip of the current weapon (muzzle
+    // offsets are per-weapon barrel lengths, scaled with the view-model).
+    const muzzleReach = [0.25, 0.5, 0.62, 0.6, 0.8][p.w] || 0.5;
+    muzzleFlash.position.set(0.34, -0.28, -0.55 - muzzleReach);
+    muzzleFlash.visible = p.alive && cameraMode === 'fpp' && (p.muzzle || 0) > 0;
     // Tracers.
     let ti = 0;
     for (const e of s.effects) {
@@ -302,6 +423,54 @@ export function view(s, prefs) {
       line.material.opacity = Math.max(0, e.life / 0.12) * 0.9;
     }
     for (; ti < tracers.length; ti++) tracers[ti].visible = false;
+    // Beams for the same effects: stretched from the shot's origin to its
+    // endpoint, fading with the effect's remaining life. Both ends are
+    // kept at least 1.2 m from the camera: a beam that starts or ends at
+    // the lens blows out into a giant triangle at the near plane.
+    let bi = 0;
+    for (const e of s.effects) {
+      if (bi >= beams.length) break;
+      if (e.ex === undefined) continue;
+      const beam = beams[bi++];
+      let sx = e.x, sy = e.y, sz = e.z, ex = e.ex, ey = e.ey, ez = e.ez;
+      let dx = ex - sx, dy = ey - sy, dz = ez - sz;
+      let len = Math.hypot(dx, dy, dz);
+      if (len < 0.1) { beam.visible = false; continue; }
+      const ux = dx / len, uy = dy / len, uz = dz / len;
+      const cam = camera.position;
+      const dStart = Math.hypot(sx - cam.x, sy - cam.y, sz - cam.z);
+      if (dStart < 1.2) {
+        const push = 1.2 - dStart;
+        sx += ux * push; sy += uy * push; sz += uz * push;
+      }
+      const dEnd = Math.hypot(ex - cam.x, ey - cam.y, ez - cam.z);
+      if (dEnd < 1.2) {
+        const pull = 1.2 - dEnd;
+        ex -= ux * pull; ey -= uy * pull; ez -= uz * pull;
+      }
+      dx = ex - sx; dy = ey - sy; dz = ez - sz;
+      len = Math.hypot(dx, dy, dz);
+      if (len < 0.5) { beam.visible = false; continue; }
+      beam.position.set((sx + ex) / 2, (sy + ey) / 2, (sz + ez) / 2);
+      beam.lookAt(ex, ey, ez);
+      beam.scale.set(1, 1, len);
+      beam.material.opacity = Math.max(0, Math.min(1, e.life / 0.12)) * 0.85;
+      beam.visible = true;
+    }
+    for (; bi < beams.length; bi++) beams[bi].visible = false;
+    // Bot muzzle flashes at recent gunfire spots.
+    let fi = 0;
+    for (const shot of (s.gunfire || []).slice(-4)) {
+      if (fi >= botFlashes.length) break;
+      const age = s.t - shot.t;
+      if (age > 0.15) continue;
+      const sp = botFlashes[fi++];
+      const shooter = s.actors[shot.actor];
+      sp.position.set(shot.x, eyeHeight(shooter || s.actors[0]), shot.z);
+      sp.material.opacity = 1 - age / 0.15;
+      sp.visible = true;
+    }
+    for (; fi < botFlashes.length; fi++) botFlashes[fi].visible = false;
     // Smoke clouds.
     let si = 0;
     for (const c of s.smokes) {
@@ -309,7 +478,7 @@ export function view(s, prefs) {
       const sprite = smokeSprites[si++];
       sprite.position.set(c.x, 1.2, c.z);
       sprite.visible = true;
-      sprite.material.opacity = Math.min(0.75, c.life / 15 * 0.75);
+      sprite.material.opacity = Math.min(0.85, c.life / 15 * 0.85);
     }
     for (; si < smokeSprites.length; si++) smokeSprites[si].visible = false;
     // Planted charge model + blinking light.

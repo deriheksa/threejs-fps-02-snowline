@@ -17,14 +17,25 @@ button { font-family: inherit; cursor: pointer; }
   color: #9fd8ff; font-size: 12px; letter-spacing: 2px; }
 #feed { position: absolute; top: 12px; right: 12px; text-align: right; font-size: 12px;
   color: #ffd34d; text-shadow: 0 0 4px #000; }
-#feed div { margin-bottom: 2px; }
+#feed div { margin-bottom: 2px; background: rgba(0, 10, 15, 0.55); padding: 1px 6px; }
 #radio { position: absolute; bottom: 110px; left: 12px; font-size: 12px; color: #9fd8ff;
   text-shadow: 0 0 4px #000; }
 #radio div { margin-bottom: 2px; }
 #radar { position: absolute; top: 12px; left: 12px; border: 1px solid rgba(160, 220, 255, 0.4);
-  border-radius: 50%; background: rgba(0, 10, 15, 0.6); }
+  border-radius: 8px; background: rgba(0, 10, 15, 0.6); }
+#location { position: absolute; top: 198px; left: 12px; font-size: 11px; letter-spacing: 1px;
+  color: #ffd34d; text-shadow: 0 0 4px #000; }
 #vitals { position: absolute; bottom: 16px; left: 12px; font-size: 16px; font-weight: bold;
   background: rgba(0, 10, 15, 0.75); padding: 6px 10px; border: 1px solid rgba(160, 220, 255, 0.4); }
+.vt-label { font-size: 10px; color: #9fd8ff; letter-spacing: 1px; margin-right: 4px; }
+.vt-bar { display: inline-block; width: 60px; height: 8px; background: rgba(255, 255, 255, 0.15);
+  vertical-align: middle; margin-right: 4px; }
+.vt-bar i { display: block; height: 100%; }
+.vt-money { color: #ffd34d; margin-left: 8px; }
+.sc-chip { padding: 2px 8px; font-size: 13px; letter-spacing: 1px; }
+.sc-summit { background: #2fb3ff; color: #001018; }
+.sc-vale { background: #ff7a45; color: #180800; }
+.sc-pips { font-size: 10px; letter-spacing: 2px; color: #ffd34d; }
 #ammo { position: absolute; bottom: 16px; right: 12px; font-size: 16px; font-weight: bold;
   background: rgba(0, 10, 15, 0.75); padding: 6px 10px; border: 1px solid rgba(160, 220, 255, 0.4); }
 #cross { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);

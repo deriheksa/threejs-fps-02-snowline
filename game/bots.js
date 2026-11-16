@@ -16,7 +16,20 @@ export function botBuy(s) {
   }
 }
 
-// Is a point inside the arena and clear of prop footprints?
+// Squad roles for the radio: the top entries' callouts name a role and a
+// place ("Riza (Support): 3 Breachers spotted A LONG ARCH"), not just
+// "Contact!". Roles are fixed per callsign so the same voice stays the same.
+const ROLES = {
+  1: 'Entry', 2: 'Support', 3: 'Anchor', 4: 'Entry',
+  5: 'Anchor', 6: 'Support', 7: 'Entry', 8: 'Anchor', 9: 'Entry',
+};
+const placeName = (x, z) => {
+  if (Math.hypot(x - 13, z + 10) < 5) return 'Gondola Hall';
+  if (Math.hypot(x - 13, z - 11) < 5) return 'Cable Yard';
+  if (z < -7) return 'A-long';
+  if (z > 7) return 'B-long';
+  return 'Mid';
+};
 const clear = (x, z) =>
   Math.abs(x) < 20.6 && Math.abs(z) < 16.6
   && !cover.some((p) => Math.abs(x - p.x) < p.w / 2 + 0.42 && Math.abs(z - p.z) < p.d / 2 + 0.42);
@@ -136,7 +149,8 @@ export function bots(s, dt, move, interact) {
       }
       if (s.t - (a.lastRadio ?? -20) > 8) {
         a.lastRadio = s.t;
-        log(s, `${a.name}: Contact! ${a.behavior}`);
+        const seen = enemies.length;
+        log(s, `${a.name} (${ROLES[a.id]}): ${seen > 1 ? `${seen} spotted` : 'Contact'} at ${placeName(e.x, e.z)}, ${a.behavior}`);
       }
       // A bot that plants or defuses must restart an uninterrupted hold.
       a.progress = 0;

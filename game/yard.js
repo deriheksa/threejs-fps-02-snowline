@@ -47,6 +47,8 @@ export function yard(scene) {
   scene.add(stencil('KEEP DRY', 2, 1.8, -12.5, Math.PI));
   scene.add(stencil('SG-7', -12, 1.5, 11.2, 0));
   scene.add(stencil('KEEP DRY', 2, 1.8, 11.2, 0));
+  scene.add(stencil('SNOWLINE', -6, 1.5, 2.05, 0));
+  scene.add(stencil('LIFT 2', 2, 1.5, -2.05, Math.PI));
   // Cable spools in the yard.
   for (const [x, z] of [[10.7, -15], [10.7, 15]]) {
     const spool = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 0.7, 0.5, 16), steel);
