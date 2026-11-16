@@ -29,9 +29,11 @@ export function view(s, prefs) {
 
   const scene = world();
   const camera = new THREE.PerspectiveCamera(prefs.fov, innerWidth / innerHeight, 0.05, 220);
-  // A small warm fill light rides with the camera so the view-model gun and
-  // nearby props are never pitch black.
-  const camLight = new THREE.PointLight(0xfff2dd, 0.9, 3, 1.5);
+  // A warm fill light rides with the camera so the view-model gun and
+  // nearby props never go pitch black. It has to be strong (the gun's
+  // materials are dark and ACES crushes the mids): at 0.9 the receiver
+  // read as a flat black slab in the screenshots.
+  const camLight = new THREE.PointLight(0xfff2dd, 2.2, 4, 1.5);
   camera.add(camLight);
   const motion = viewMotion();
   let gunMesh = null;
@@ -72,7 +74,10 @@ export function view(s, prefs) {
     smokeMap = new THREE.CanvasTexture(smokeCanvas);
   }
   const smokeMat = new THREE.SpriteMaterial({
-    color: 0xcfd8dc, transparent: true, opacity: 0.55, depthWrite: false,
+    // Dark slate, not white: against snow and pale walls a white cloud is
+    // invisible. A smoke grenade reads as a grey cloud, so the sprite is
+    // a mid-dark blue-grey at high opacity.
+    color: 0x5a6a75, transparent: true, opacity: 0.75, depthWrite: false,
     ...(smokeMap ? { map: smokeMap } : {}),
   });
   for (let i = 0; i < 8; i++) {
@@ -119,23 +124,43 @@ export function view(s, prefs) {
       p.x = -14; p.z = 0; aim(-Math.PI / 2, 0);
       staged = true;
     } else if (shotMode === 'play' && s.phase === 'live') {
-      // A-long, looking east toward site A: a clean open sightline (the Mid
-      // baffles block the equivalent Mid shot), enemies in the open ahead.
-      p.x = -6; p.z = -11; aim(-Math.PI / 2, 0);
-      const spots = [[0, -11], [2, -10], [4, -12]];
+      // Mid lane, looking east-southeast: the sunlit lane, both site signs,
+      // the ridge and the sky in frame, three VALE soldiers in the open
+      // ahead. (A-long puts the camera in the north wing's shadow with a
+      // cargo crate in the foreground.) One smoke cloud drifts behind the
+      // soldiers so it frames them instead of veiling them; tracers run
+      // from the player's muzzle out and from a soldier back in.
+      p.x = -8; p.z = 0; aim(-1.75, 0);
+      const spots = [[-3, -1.2], [-1, 1], [1, -0.8]];
       for (let i = 0; i < 3; i++) {
         const e = s.actors[5 + i];
         e.x = spots[i][0]; e.z = spots[i][1]; e.alive = true;
       }
-      s.effects.push({ x: p.x, z: p.z, y: 1.6, ex: 0, ez: -11, ey: 1.5, life: 5, team: 0, shooter: 0 });
-      s.smokes.push({ x: 2, z: -11.5, life: 15 });
+      s.effects.push({ x: p.x, z: p.z, y: 1.5, ex: -3, ez: -1.2, ey: 1.4, life: 5, team: 0, shooter: 0 });
+      s.effects.push({ x: -1, z: 1, y: 1.5, ex: p.x, ez: p.z, ey: 1.5, life: 5, team: 1, shooter: 5 });
+      s.smokes.push({ x: 3, z: 0, life: 15 });
       staged = true;
     } else if (shotMode === 'end' && s.phase === 'live') {
-      // Outside site A, looking in through the west entry: the planted
-      // charge, the red gondola cabin and the site signage all in frame
-      // (standing inside puts the camera under the hall canopy).
-      p.x = 6; p.z = -12; aim(-Math.PI / 2, 0);
+      // South entry of site A, looking north through the gap: the planted
+      // charge in front of the red gondola cabin, GONDOLA HALL signage
+      // above, two defenders closing in. Standing a metre west of the
+      // entry's centre line keeps the fence post off the charge.
+      p.x = 12; p.z = -5.5; aim(-0.22, 0);
       s.bomb = { x: 13, z: -10, fuse: 30 };
+      // Hold fire while the still is taken: the defenders are metres away
+      // with a clear line of sight, and a hit would light the damage
+      // vignette across the frame. Reaction delay is ~0.25 s, so a -30 s
+      // head start plus a long cooldown keeps every VALE bot quiet.
+      // Staging only — this branch never runs without ?shot=end.
+      for (const e of s.actors.slice(5)) { e.react = -30; e.cool = 30; }
+      // Bright phase for the charge's blinking light, so the amber dot
+      // reads in the still.
+      if (Math.sin(s.t * 6) <= 0) s.t += Math.PI / 6;
+      const guards = [[11.5, -9], [15, -11]];
+      for (let i = 0; i < 2; i++) {
+        const e = s.actors[5 + i];
+        e.x = guards[i][0]; e.z = guards[i][1]; e.alive = true; e.yaw = Math.PI;
+      }
       staged = true;
     }
   }
@@ -231,6 +256,11 @@ export function view(s, prefs) {
     for (const a of s.actors) {
       const g = animatedSoldier(a, s.t, dt);
       if (g && !g.parent) scene.scene.add(g);
+      // First person hides the player's own soldier: its held gun hangs
+      // across the bottom of the screen as a black bar (the view-model gun
+      // is the separate weaponModel on the camera). A dead player's body
+      // stays visible for the spectator view, and TPP keeps the soldier.
+      if (g && a.id === 0 && p.alive && cameraMode === 'fpp') g.visible = false;
     }
     // Camera.
     if (!p.alive) {
@@ -279,7 +309,7 @@ export function view(s, prefs) {
       const sprite = smokeSprites[si++];
       sprite.position.set(c.x, 1.2, c.z);
       sprite.visible = true;
-      sprite.material.opacity = Math.min(0.55, c.life / 15 * 0.55);
+      sprite.material.opacity = Math.min(0.75, c.life / 15 * 0.75);
     }
     for (; si < smokeSprites.length; si++) smokeSprites[si].visible = false;
     // Planted charge model + blinking light.
