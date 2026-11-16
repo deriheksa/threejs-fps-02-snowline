@@ -48,7 +48,7 @@ export function world() {
   const sun = new THREE.DirectionalLight(0xffd9a0, 1.6);
   sun.position.set(-30, 40, -20);
   sun.castShadow = true;
-  sun.shadow.mapSize.set(2048, 2048);
+  sun.shadow.mapSize.set(1024, 1024);
   sun.shadow.camera.left = -30;
   sun.shadow.camera.right = 30;
   sun.shadow.camera.top = 30;

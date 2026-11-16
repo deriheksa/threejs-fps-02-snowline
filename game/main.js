@@ -2,8 +2,8 @@
 // The loop runs the simulation at 60 Hz and renders every frame. All menu
 // and shop clicks go through the action handler below; the simulation
 // modules never touch the DOM.
-import { createState, startRound, buy, weapons } from './state.js';
-import { step, interact } from './simulation.js';
+import { createState, buy, weapons } from './state.js';
+import { step, interact, startRound } from './simulation.js';
 import { fire, reload, grenade } from './combat.js';
 import { view } from './view.js';
 import { controls } from './controls.js';
